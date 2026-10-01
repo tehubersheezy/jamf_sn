@@ -14,7 +14,7 @@ All conventions and SDK type signatures are now verified directly from the start
 Scaffold (Phase 0, run in `/Users/abey/Projects/jamf_sn`):
 
 ```bash
-npx now-sdk auth --add <dev-instance-url>   # if not already authenticated
+pnpm exec now-sdk auth --add <dev-instance-url>   # if not already authenticated
 npx @servicenow/sdk@4.8.1 init --appName "JAMF PRO" \
     --packageName jamf-cmdb-connector --scopeName x_912401_jamf_pro --template base
 ```
@@ -210,7 +210,7 @@ CrossScopePrivilege({
   targetScope: 'sn_cmdb', targetType: 'scriptable',
 })
 ```
-Not needed: `sn_ws.RESTMessageV2` (available to all scopes without privilege), `gs.getProperty`, `GlideDateTime`, read of `sys_user` (global tables default-readable from scoped script). CMDB writes happen inside IRE's own context, not ours. **Verification step**: after the first end-to-end run, check `sys_scope_privilege` for any auto-created `requested` rows; if the instance demanded more (e.g. `sys_user` read on hardened instances), set them to allowed and `npm run transform` to pull them into source.
+Not needed: `sn_ws.RESTMessageV2` (available to all scopes without privilege), `gs.getProperty`, `GlideDateTime`, read of `sys_user` (global tables default-readable from scoped script). CMDB writes happen inside IRE's own context, not ours. **Verification step**: after the first end-to-end run, check `sys_scope_privilege` for any auto-created `requested` rows; if the instance demanded more (e.g. `sys_user` read on hardened instances), set them to allowed and `pnpm run transform` to pull them into source.
 
 ### 3.6 Scheduled script — `scheduled-scripts/daily-sync.now.ts`
 ```ts
@@ -218,7 +218,7 @@ ScheduledScript({
   $id: Now.ID['daily-sync-job'],
   name: 'Jamf CMDB Daily Sync',
   frequency: 'daily',
-  executionTime: '02:00:00',   // verify TimeOfDay literal via: npx now-sdk explain scheduled-script
+  executionTime: '02:00:00',   // verify TimeOfDay literal via: pnpm exec now-sdk explain scheduled-script
   timeZone: 'floating',
   active: true,
   script: "new x_912401_jamf_pro.JamfSyncRunner().run('scheduled');",
@@ -253,13 +253,13 @@ Eight files, one per class, each exactly like the starter pattern: `$id: Now.ID[
 
 ## 5. Implementation order (each phase builds & deploys green)
 
-1. **Phase 0 — scaffold**: auth, `sdk init` (scope `x_912401_jamf_pro`), align package.json/CLAUDE.md/settings, `npm run build && npm run deploy` (empty app). Confirm scope creates cleanly (see Risk #1).
+1. **Phase 0 — scaffold**: auth, `sdk init` (scope `x_912401_jamf_pro`), align package.json/CLAUDE.md/settings, `pnpm run build && pnpm run deploy` (empty app). Confirm scope creates cleanly (see Risk #1).
 2. **Phase 1 — data layer**: role, table, ACLs, properties, app menu, discovery-source choice. Build/deploy; verify table + properties + `cmdb_ci.discovery_source` choice on instance; commit `keys.ts`.
 3. **Phase 2 — config + logging**: `JamfConfig.js`, `JamfRunLogger.js` + fluent defs. Deploy; scoped background script (scope picker = JAMF PRO): set dummy secret, assert `gs.getProperty('x_912401_jamf_pro.client_secret')` returns plaintext (password2 check), exercise `start/complete/skip`.
 4. **Phase 3 — HTTP client**: `JamfApiClient.js`. Deploy; background-script token fetch + one `getAllPages` against real Jamf (or mock base_url, §Verification).
 5. **Phase 4 — mappers + IRE**: `JamfMapperBase/JamfComputerMapper/JamfMobileDeviceMapper/JamfIreGateway` + cross-scope privilege. Deploy; background script feeds one hand-written sample device JSON through `mapper.map` → `gateway.add/flush` → assert `cmdb_ci_computer` created, `discovery_source=JamfPro`, `cmdb_serial_number` entry, adapter + `cmdb_rel_ci` relation. Re-run → `NO_CHANGE`.
 6. **Phase 5 — orchestrator + schedule**: `JamfSyncRunner.js`, scheduled script. Deploy; Execute Now; verify run record counters vs CMDB.
-7. **Phase 6 — hardening pass**: mutex/stale/retention paths, verbose logging, README (setup: Jamf API role grants needed for the client — Read Computers, Read Mobile Devices), `npm run transform` sweep for any instance-side `requested` privileges.
+7. **Phase 6 — hardening pass**: mutex/stale/retention paths, verbose logging, README (setup: Jamf API role grants needed for the client — Read Computers, Read Mobile Devices), `pnpm run transform` sweep for any instance-side `requested` privileges.
 
 **Verification without a real Jamf instance** — two layers: (a) *no HTTP at all*: the DI seam — background script builds `{ get:function(p,q){...fixtures...}, getAllPages:function(...){...} }` fake client, `new x_912401_jamf_pro.JamfSyncRunner({client: fake}).run('test')`, then asserts run-log counters and CMDB records; (b) *HTTP path*: point `x_912401_jamf_pro.base_url` at a mock (Beeceptor/mockoon, or a scripted REST API in a throwaway scope on the same instance serving the fixture JSON for `/api/oauth/token`, `/api/v1/computers-inventory`, `/api/v2/mobile-devices*`).
 
@@ -268,7 +268,7 @@ Eight files, one per class, each exactly like the starter pattern: `$id: Now.ID[
 1. **Scope name `x_912401_jamf_pro`**: instances normally enforce `x_<vendorprefix>_<name>`; `sdk init` validates against the instance vendor prefix. If rejected, the confirmed name needs revisiting — surface immediately in Phase 0.
 2. **password2 same-scope read**: expected to decrypt via `gs.getProperty` from `x_912401_jamf_pro`; verified in Phase 2 before anything depends on it. Fallback: `GlideRecord` on `sys_properties` + `getDecryptedValue()` (same-scope).
 3. **Jamf mobile bulk detail** (`/api/v2/mobile-devices/detail`) exists only on newer Jamf Pro; handled by 404 fallback to per-device, but per-device is N+1 (slow >2k devices). Field-name differences between bulk/detail payloads need verification against a live tenant.
-4. **`executionTime`/TimeOfDay literal format** — confirm via `npx now-sdk explain scheduled-script` before writing the fluent file.
+4. **`executionTime`/TimeOfDay literal format** — confirm via `pnpm exec now-sdk explain scheduled-script` before writing the fluent file.
 5. **sys_choice on cmdb_ci from app scope** — should deploy as app data; if the platform blocks it, fallback is a one-time fix script or documented manual choice creation.
 6. **IRE reference resolution** (`model_id`/`manufacturer` as display strings) — matches SG-connector behavior, but first live run should confirm no `identificationAttempts` errors; if so, pre-create `cmdb_model` via related items.
 7. **Coexistence with ServiceNow's SG-Jamf connector**: if a customer later installs it, two discovery sources will feed the same CIs — reconciliation/precedence rules (`cmdb_reconciliation_definition`) are out of scope but should be documented in the README.

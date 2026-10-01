@@ -14,12 +14,12 @@ npx @servicenow/sdk explain <topic> --format=raw                 # read
 ## Commands
 
 ```bash
-npm run build      # compile + validate. ALWAYS run after editing fluent/server files
-npm run build:ci   # frozen-keys build for CI (fails if keys.ts would change)
-npm run deploy     # install dist/ on the authenticated instance. Only after a passing build
-npm run types      # fetch instance type defs for autocomplete
-npm run transform  # convert instance XML changes back to fluent source
-npx now-sdk auth --list   # check instance credentials
+pnpm run build      # compile + validate. ALWAYS run after editing fluent/server files
+pnpm run build:ci   # frozen-keys build for CI (fails if keys.ts would change)
+pnpm run deploy     # install dist/ on the authenticated instance. Only after a passing build
+pnpm run types      # fetch instance type defs for autocomplete
+pnpm run transform  # convert instance XML changes back to fluent source
+pnpm exec now-sdk auth --list   # check instance credentials
 ```
 
 ## Hard rules
@@ -40,13 +40,13 @@ Putting a `Class.create()` file in `src/server/` fails the build (module linter)
 
 ## Project tooling for Claude
 
-- `.claude/settings.json` pre-approves build/doc/query commands and defines two hooks: edits to `src/fluent/generated/keys.ts` are blocked, and every edit under `src/` triggers `npm run build` automatically (build failures are fed back — fix them before moving on).
+- `.claude/settings.json` pre-approves build/doc/query commands and defines two hooks: edits to `src/fluent/generated/keys.ts` are blocked, and every edit under `src/` triggers `pnpm run build` automatically (build failures are fed back — fix them before moving on).
 
 ## Workflow
 
 1. Edit / add `.now.ts` + supporting scripts.
-2. `npm run build` — fix diagnostics; the build enforces naming and reference rules.
+2. `pnpm run build` — fix diagnostics; the build enforces naming and reference rules.
 3. Commit `keys.ts` changes together with the code that added the keys.
-4. `npm run deploy` to push to the dev instance when asked.
+4. `pnpm run deploy` to push to the dev instance when asked.
 
 The app scope is `x_912401_jamf_pro`.

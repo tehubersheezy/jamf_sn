@@ -164,7 +164,7 @@ Maps an `x_912401_jamf_pro_command_log` row → endpoint + body + identifier (re
 | `poll_attempts` | IntegerColumn (default 0) / `last_polled` DateTimeColumn | |
 | `error_reason` | StringColumn maxLength 4000 | truncated Jamf error / guard-refusal / missing-approval reason |
 
-> If a typed reference to `sysapproval_approver` is later preferred over the plain sys_id column, add it to the `now-sdk dependencies` / `npm run types` typedef-generation list (the same mechanism used for the CI and SIR tables) **before** defining this table.
+> If a typed reference to `sysapproval_approver` is later preferred over the plain sys_id column, add it to the `now-sdk dependencies` / `pnpm run types` typedef-generation list (the same mechanism used for the CI and SIR tables) **before** defining this table.
 
 ### 4.3 New `sys_properties` — EDIT `src/fluent/properties/jamf-properties.now.ts`
 
@@ -239,7 +239,7 @@ First-class: `UiAction` (needs generated CI typedefs), `BusinessRule`, `Flow`/`S
 
 ## 8. Cross-scope privileges
 
-**None needed beyond what all scopes have.** `sn_ws.RESTMessageV2` is privilege-free; `sn_cmdb.IdentificationEngine` is **not called outbound** (inbound-only); global/`cmdb` writes are avoided because identifiers live in the scoped `x_912401_jamf_pro_device`; `gs.getProperty`/`GlideDateTime`/`GlideDigest`/`Math.random` (PIN)/in-scope table writes/`sys_user` read need nothing extra. `askForApproval`/Flow/Catalog are platform features; `sysapproval_approver` is referenced by sys_id (a plain string), so no foreign typedef or cross-scope read is required. `sn_si_incident` is not a privilege — it needs the **SIR plugin** + generated typedef (falls back to `incident` BR). Same post-deploy `sys_scope_privilege` sweep + `npm run transform` as inbound.
+**None needed beyond what all scopes have.** `sn_ws.RESTMessageV2` is privilege-free; `sn_cmdb.IdentificationEngine` is **not called outbound** (inbound-only); global/`cmdb` writes are avoided because identifiers live in the scoped `x_912401_jamf_pro_device`; `gs.getProperty`/`GlideDateTime`/`GlideDigest`/`Math.random` (PIN)/in-scope table writes/`sys_user` read need nothing extra. `askForApproval`/Flow/Catalog are platform features; `sysapproval_approver` is referenced by sys_id (a plain string), so no foreign typedef or cross-scope read is required. `sn_si_incident` is not a privilege — it needs the **SIR plugin** + generated typedef (falls back to `incident` BR). Same post-deploy `sys_scope_privilege` sweep + `pnpm run transform` as inbound.
 
 **Jamf API Role (outbound-only, README):** "Send Computer/Mobile Device MDM Command" (per device type + each command — including **DeviceLock with PIN** for computers), "Send Blank Push", "Renew MDM Profile", "Erase Computer", "Erase Mobile Device", "Remove MDM Profile", "Read/Update Mobile Device Groups", deploy-package / managed-software-update grants, and "View MDM Command Information" (reconciler `GET`).
 
@@ -253,7 +253,7 @@ Each phase deploys green; verification touches no real device (dry-run + fake cl
 - **C — HTTP + client:** edit `JamfApiClient.post()`, add `JamfCommandClient`. Verify token + `getCommands` GET against a **mock base_url**.
 - **D — service + logger (dry-run):** `JamfCommandService` + `JamfCommandLogger`. Verify `create` blank-push produces a `dry_run` row, no POST; verify a `source=api` destructive `create` lands in `pending_approval` (not `pending_send`) and that `send` refuses it without an approval; exercise dedupe, in-flight guard, and `_redactPayload` (PIN absent from `action_payload`).
 - **E — reconciler + first safe live command:** reconciler script (`periodically`, 10 min). With a real tenant + dry-run OFF, issue **Blank Push** (safest) to one test device; watch `pending_send → sent → acknowledged`; confirm expiry on an offline device.
-- **F — trigger surface:** generate CI typedefs (`npm run types`), then non-destructive UI Actions (mobile lock/clear-passcode present; computer lock/clear-passcode absent). Verify gating + dry-run rows.
+- **F — trigger surface:** generate CI typedefs (`pnpm run types`), then non-destructive UI Actions (mobile lock/clear-passcode present; computer lock/clear-passcode absent). Verify gating + dry-run rows.
 - **G — destructive + approvals:** flow actions, offboarding subflow, catalog items with `askForApproval`, erase-**and-computer-lock** PIN handling. Verify "Wipe Apple Device" and "Lock Mac" route to approver; on approve, log a `dry_run` row with `unlock_pin` visible only to admin and redacted from `action_payload`; reject sets `rejected`; a hand-forced `pending_send` destructive row with no approval is refused at `send` (→ `error`).
 - **H — security-incident + hardening:** SIR flow (or `incident` BR fallback) with mobile-immediate / computer-gated split, group-erase guard, README, `sys_scope_privilege` sweep + `transform`. Verify immediate mobile lock+lost-mode, gated computer lock/erase, and group-erase refusal while `group_erase_max=0`.
 

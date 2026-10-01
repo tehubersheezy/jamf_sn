@@ -16,5 +16,6 @@
     "devDependencies": {
         "@servicenow/sdk": "4.8.1",
         "@servicenow/glide": "27.0.5"
-    }
+    },
+    "packageManager": "pnpm@11.7.0"
 }

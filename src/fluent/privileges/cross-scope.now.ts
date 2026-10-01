@@ -9,7 +9,7 @@ import { CrossScopePrivilege } from '@servicenow/sdk/core'
 // Not needed: sn_ws.RESTMessageV2, gs.getProperty, GlideDateTime, sys_user
 // reads — all default-available to scoped scripts. After the first live run,
 // check sys_scope_privilege for any auto-created 'requested' rows and
-// `npm run transform` to pull them into source.
+// `pnpm run transform` to pull them into source.
 
 CrossScopePrivilege({
     $id: Now.ID['xsp-ire-execute'],
